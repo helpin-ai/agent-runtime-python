@@ -1,0 +1,21 @@
+[project]
+name = "agent-runtime"
+version = "0.2.0"
+description = "Python client and adapter helpers for the Agent Runtime service"
+readme = "README.md"
+authors = [{ name = "Helpin AI" }]
+requires-python = ">=3.10"
+dependencies = [
+  "httpx>=0.25",
+  "pydantic>=1.10",
+]
+
+[project.urls]
+Repository = "https://github.com/helpin-ai/agent-runtime-python"
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.110"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent_runtime*"]
