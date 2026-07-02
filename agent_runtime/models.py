@@ -217,6 +217,7 @@ class AgentRunMessage(BaseModel):
     id: str
     app_id: str
     run_id: str
+    runtime_message_id: Optional[str] = None
     role: str
     content: str
     message_type: str

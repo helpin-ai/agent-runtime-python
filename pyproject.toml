@@ -1,6 +1,6 @@
 [project]
 name = "agent-runtime"
-version = "0.2.0"
+version = "0.2.1"
 description = "Python client and adapter helpers for the Agent Runtime service"
 readme = "README.md"
 authors = [{ name = "Helpin AI" }]
