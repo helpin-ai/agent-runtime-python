@@ -18,12 +18,36 @@ run = client.start_run({
 })
 ```
 
+Runtime diagnostics, paginated run search, persisted event history, execution
+details, and live Server-Sent Events are exposed as typed helpers.
+
+```python
+capabilities = client.get_capabilities()
+page = client.search_runs(status="running", limit=25)
+history = client.list_run_events(run.id)
+
+for event in client.iter_run_events(run.id):
+    print(event.sequence_no, event.type)
+```
+
 Codex ChatGPT device-code auth can be driven through the SDK when a Codex run
 pauses for authentication.
 
 ```python
 state = client.start_codex_device_code_auth(run.id)
 print(state.verification_url, state.user_code)
+```
+
+Use stable correlation fields when a resume may be retried or resolves a
+specific pending interaction.
+
+```python
+resumed = client.resume_run(run.id, {
+    "intent": "reply",
+    "content": "Continue with this answer.",
+    "resume_id": "message-123",
+    "interaction_id": "interaction-456",
+})
 ```
 
 Run-scoped tools are also available through the service API. Workspace-coupled
@@ -58,6 +82,25 @@ async def resolve_context(request):
     )
 
 app.include_router(create_fastapi_target_context_router(resolve_context, token="service-token"))
+```
+
+Per-app HTTP event callbacks can use the same typed envelope and bearer-token
+verification.
+
+```python
+from agent_runtime import create_fastapi_event_callback_router
+
+async def receive_event(event):
+    await project_event(event)
+    return {"accepted": True}
+
+app.include_router(
+    create_fastapi_event_callback_router(
+        receive_event,
+        token="callback-token",
+        app_id="host_app",
+    )
+)
 ```
 
 The SDK also includes FastAPI router helpers for the host-side HTTP contracts
@@ -104,4 +147,22 @@ app.include_router(
     ),
     prefix="/agent-runtime/workspaces",
 )
+```
+
+## NATS / JetStream events
+
+Install the optional integration with `pip install "agent-runtime[nats]"`.
+The async consumer matches the runtime's default stream/subject layout and
+uses explicit acknowledgements with bounded progressive retries.
+
+```python
+from agent_runtime.nats import NATSConsumer, NATSConsumerConfig
+
+consumer = NATSConsumer(NATSConsumerConfig(
+    url="nats://nats.internal:4222",
+    app_id="host_app",
+    durable="host-app-agent-runtime",
+))
+
+await consumer.run(receive_event)
 ```

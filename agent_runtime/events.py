@@ -10,6 +10,11 @@ from .constants import (
     EVENT_ASSISTANT_MESSAGE_COMPLETED,
     EVENT_ASSISTANT_MESSAGE_DELTA,
     EVENT_ASSISTANT_MESSAGE_STARTED,
+    EVENT_CODEX_AUTH_STATE_CHANGED,
+    EVENT_PLAN_UPDATED,
+    EVENT_REASONING_MESSAGE_COMPLETED,
+    EVENT_REASONING_MESSAGE_DELTA,
+    EVENT_REASONING_MESSAGE_STARTED,
     EVENT_TOOL_CALL_ARGS_DELTA,
     EVENT_TOOL_CALL_FINISHED,
     EVENT_TOOL_CALL_RESULT,
@@ -61,6 +66,25 @@ class EventEnvelope(BaseModel):
             return None, False
         return ToolCallEventData(**self.data), True
 
+    def reasoning_message(self) -> Tuple[Optional["ReasoningMessageEventData"], bool]:
+        if self.type not in {
+            EVENT_REASONING_MESSAGE_STARTED,
+            EVENT_REASONING_MESSAGE_DELTA,
+            EVENT_REASONING_MESSAGE_COMPLETED,
+        }:
+            return None, False
+        return ReasoningMessageEventData(**self.data), True
+
+    def plan_updated(self) -> Tuple[Optional["PlanUpdatedEventData"], bool]:
+        if self.type != EVENT_PLAN_UPDATED:
+            return None, False
+        return PlanUpdatedEventData(**self.data), True
+
+    def codex_auth_state(self) -> Tuple[Optional["CodexAuthStateEventData"], bool]:
+        if self.type != EVENT_CODEX_AUTH_STATE_CHANGED:
+            return None, False
+        return CodexAuthStateEventData(**self.data), True
+
 
 class UsageCheckpointEventData(BaseModel):
     usage: Usage
@@ -104,6 +128,18 @@ class PlanUpdatedEventData(BaseModel):
     plan: List[RunPlanStep] = Field(default_factory=list)
     note: Optional[str] = None
     data: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CodexAuthStateEventData(BaseModel):
+    provider: Optional[str] = None
+    auth_mode: Optional[str] = None
+    state: str
+    login_id: Optional[str] = None
+    auth_url: Optional[str] = None
+    verification_url: Optional[str] = None
+    user_code: Optional[str] = None
+    plan_type: Optional[str] = None
+    error: Optional[str] = None
 
 
 def parse_event_envelope(payload: bytes | str | Dict[str, Any]) -> EventEnvelope:

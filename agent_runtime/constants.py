@@ -6,7 +6,11 @@ INVOCATION_AUTONOMOUS = "autonomous"
 INVOCATION_INTERACTIVE = "interactive"
 
 APPROVAL_MODE_NEVER = "never"
+APPROVAL_MODE_MUTATING_TOOLS = "mutating_tools"
 APPROVAL_MODE_ALWAYS = "always"
+
+EXECUTION_MODE_LIGHTWEIGHT = "lightweight"
+EXECUTION_MODE_DURABLE = "durable"
 
 RUN_STATUS_QUEUED = "queued"
 RUN_STATUS_RUNNING = "running"
@@ -32,9 +36,18 @@ APPROVAL_REJECTED = "rejected"
 RESUME_INTENT_REPLY = "reply"
 RESUME_INTENT_APPROVE = "approve"
 RESUME_INTENT_REQUEST_CHANGES = "request_changes"
+RESUME_INTENT_AUTH_COMPLETED = "auth_completed"
+
+CODEX_AUTH_STATE_REQUIRED = "required"
+CODEX_AUTH_STATE_PENDING = "pending"
+CODEX_AUTH_STATE_CONNECTED = "connected"
+CODEX_AUTH_STATE_FAILED = "failed"
+CODEX_AUTH_STATE_CANCELLED = "cancelled"
 
 WORKSPACE_MODE_HOST_PREPARED = "host_prepared"
 WORKSPACE_MODE_REPOSITORY = "repository"
+WORKSPACE_ACCESS_READ_ONLY = "read_only"
+WORKSPACE_ACCESS_READ_WRITE = "read_write"
 
 CLEANUP_ALWAYS = "always"
 CLEANUP_ON_TERMINAL = "on_terminal"
@@ -54,6 +67,7 @@ EVENT_RUN_FAILED = "run.failed"
 EVENT_RUN_CANCELLED = "run.cancelled"
 
 EVENT_USAGE_CHECKPOINT = "usage.checkpoint"
+EVENT_CODEX_AUTH_STATE_CHANGED = "codex_auth.state_changed"
 
 EVENT_ASSISTANT_MESSAGE_STARTED = "assistant_message_started"
 EVENT_ASSISTANT_MESSAGE_DELTA = "assistant_message_delta"

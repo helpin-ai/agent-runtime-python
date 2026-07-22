@@ -28,7 +28,7 @@ class SkillRef(BaseModel):
 
 class Agent(BaseModel):
     id: Optional[str] = None
-    app_id: str
+    app_id: str = ""
     name: str
     runtime_kind: str = "native_sdk"
     provider: Optional[str] = None
@@ -49,6 +49,7 @@ class MCPProviderConfig(BaseModel):
     transport: str = "http"
     url: Optional[str] = None
     token: Optional[str] = None
+    token_env: Optional[str] = None
     command: Optional[str] = None
     args: List[str] = Field(default_factory=list)
     env: Dict[str, str] = Field(default_factory=dict)
@@ -60,12 +61,14 @@ class CommandProviderConfig(BaseModel):
     transport: str = "http"
     base_url: str
     token: Optional[str] = None
+    token_env: Optional[str] = None
 
 
 class WorkspaceProviderConfig(BaseModel):
     transport: str = "http"
     base_url: str
     token: Optional[str] = None
+    token_env: Optional[str] = None
     root_dir: Optional[str] = None
 
 
@@ -73,14 +76,25 @@ class SkillProviderConfig(BaseModel):
     transport: str = "http"
     base_url: str
     token: Optional[str] = None
+    token_env: Optional[str] = None
     package_base_url: Optional[str] = None
     package_token: Optional[str] = None
+    package_token_env: Optional[str] = None
+
+
+class EventCallbackConfig(BaseModel):
+    url: str
+    token: Optional[str] = None
+    token_env: Optional[str] = None
+    event_types: List[str] = Field(default_factory=list)
 
 
 class AppConfigApp(BaseModel):
     app_id: str
     context_endpoint: Optional[str] = None
     context_token: Optional[str] = None
+    context_token_env: Optional[str] = None
+    event_callbacks: List[EventCallbackConfig] = Field(default_factory=list)
     mcp_providers: List[MCPProviderConfig] = Field(default_factory=list)
     command_provider: Optional[CommandProviderConfig] = None
     workspace_provider: Optional[WorkspaceProviderConfig] = None
@@ -341,7 +355,7 @@ class CodexAuthState(BaseModel):
 
 
 class StartRunRequest(BaseModel):
-    app_id: str
+    app_id: str = ""
     host_run_id: Optional[str] = None
     agent_id: str
     target: TargetRef
@@ -360,6 +374,8 @@ class ResumeRunRequest(BaseModel):
     content: Optional[str] = None
     response_payload: Optional[Dict[str, Any]] = None
     external_actor_id: Optional[str] = None
+    resume_id: Optional[str] = None
+    interaction_id: Optional[str] = None
 
 
 class AppendMessageRequest(BaseModel):
@@ -374,6 +390,78 @@ class AppendArtifactRequest(BaseModel):
     storage_mode: Optional[str] = None
     inline_content: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderCapability(BaseModel):
+    name: str
+    configured: bool = False
+    default_model: Optional[str] = None
+    base_url_overridden: bool = False
+
+
+class StoreInfo(BaseModel):
+    driver: str
+    in_memory: bool = False
+
+
+class DurableInfo(BaseModel):
+    enabled: bool = False
+    temporal_address: Optional[str] = None
+    namespace: Optional[str] = None
+
+
+class SkillInfo(BaseModel):
+    key: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
+class AppComponent(BaseModel):
+    name: Optional[str] = None
+    kind: Optional[str] = None
+    configured: bool = False
+    url: Optional[str] = None
+    transport: Optional[str] = None
+    auth_configured: bool = False
+    status: Optional[str] = None
+    http_status: Optional[int] = None
+    error: Optional[str] = None
+
+
+class AppSummary(BaseModel):
+    app_id: str
+    components: List[AppComponent] = Field(default_factory=list)
+
+
+class Capabilities(BaseModel):
+    runtime_kinds: List[str] = Field(default_factory=list)
+    providers: List[ProviderCapability] = Field(default_factory=list)
+    store: StoreInfo
+    durable: DurableInfo
+    skills: List[SkillInfo] = Field(default_factory=list)
+    apps: List[AppSummary] = Field(default_factory=list)
+    service_auth_enabled: bool = False
+    tools: List[ToolDefinition] = Field(default_factory=list)
+
+
+class RunPage(BaseModel):
+    items: List[AgentRun] = Field(default_factory=list)
+    total: int = 0
+    limit: int = 0
+    offset: int = 0
+
+
+class RunExecutionInfo(BaseModel):
+    execution_mode: str
+    state: str
+    workflow_id: Optional[str] = None
+    temporal_run_id: Optional[str] = None
+    task_queue: Optional[str] = None
+    history_length: Optional[int] = None
+    history_size_bytes: Optional[int] = None
+    state_transition_count: Optional[int] = None
+    started_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
 
 
 class TargetContextRequest(BaseModel):

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable, List, Optional, Union
+import secrets
+from typing import Any, Awaitable, Callable, List, Optional, Union
+
+from .events import EventEnvelope
 
 from .models import (
     CleanupWorkspaceRequest,
@@ -60,6 +63,10 @@ SkillPackageObjectHandler = Callable[
     [str],
     Union[bytes, Awaitable[bytes]],
 ]
+EventCallbackHandler = Callable[
+    [EventEnvelope],
+    Union[Any, Awaitable[Any]],
+]
 
 
 def verify_bearer_token(authorization: Optional[str], expected_token: Optional[str]) -> None:
@@ -68,8 +75,37 @@ def verify_bearer_token(authorization: Optional[str], expected_token: Optional[s
     value = (authorization or "").strip()
     if value.lower().startswith("bearer "):
         value = value[7:].strip()
-    if value != expected_token:
+    if not secrets.compare_digest(value, expected_token):
         raise PermissionError("unauthorized")
+
+
+def create_fastapi_event_callback_router(
+    handler: EventCallbackHandler,
+    token: Optional[str] = None,
+    app_id: Optional[str] = None,
+):
+    try:
+        from fastapi import APIRouter, Header, HTTPException
+    except ImportError as exc:
+        raise RuntimeError("Install agent-runtime[fastapi] to use FastAPI adapter helpers") from exc
+
+    router = APIRouter()
+
+    @router.post("/agent-runtime/events")
+    async def receive_event(
+        event: EventEnvelope,
+        authorization: Optional[str] = Header(default=None),
+    ):
+        try:
+            verify_bearer_token(authorization, token)
+        except PermissionError:
+            raise HTTPException(status_code=401, detail="unauthorized")
+        if app_id and event.app_id != app_id:
+            raise HTTPException(status_code=403, detail="event app_id does not match this service")
+        result = await _resolve(handler(event))
+        return {"accepted": True} if result is None else result
+
+    return router
 
 
 def create_fastapi_target_context_router(handler: TargetContextHandler, token: Optional[str] = None):

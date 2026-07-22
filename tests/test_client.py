@@ -7,14 +7,17 @@ from agent_runtime import (
     Agent,
     AgentRuntimeClient,
     AgentRuntimeError,
+    AgentRuntimeHTTPError,
     AppConfig,
     CommandExecutionRequest,
     MCPProviderConfig,
     PrepareWorkspaceRequest,
     RepositoryWorkspaceSpec,
+    ResumeRunRequest,
     RESUME_INTENT_APPROVE,
     RESUME_INTENT_REQUEST_CHANGES,
     SkillLookupRequest,
+    StartRunRequest,
     TargetContextRequest,
     TargetRef,
     ToolCallRequest,
@@ -23,10 +26,10 @@ from agent_runtime import (
     USAGE_SEMANTIC_CUMULATIVE,
     AppendMessageRequest,
     EventEnvelope,
+    EVENT_CODEX_AUTH_STATE_CHANGED,
     Usage,
     parse_event_envelope,
     WorkspaceSkill,
-    create_fastapi_mcp_provider_router,
     verify_bearer_token,
 )
 
@@ -114,12 +117,12 @@ class ClientTests(unittest.TestCase):
             "app-a",
             client=httpx.Client(transport=httpx.MockTransport(handler)),
         )
-        run = client.start_run({
-            "host_run_id": "host-1",
-            "agent_id": "agent-1",
-            "target": {"type": "ticket", "id": "T-1"},
-            "turn_policy": {"mode": TURN_POLICY_PAUSE_AFTER_ASSISTANT},
-        })
+        run = client.start_run(StartRunRequest(
+            host_run_id="host-1",
+            agent_id="agent-1",
+            target={"type": "ticket", "id": "T-1"},
+            turn_policy={"mode": TURN_POLICY_PAUSE_AFTER_ASSISTANT},
+        ))
         self.assertEqual(run.id, "run-1")
 
     def test_agent_get_update_and_upsert(self):
@@ -236,6 +239,8 @@ class ClientTests(unittest.TestCase):
             if len(requests) == 2:
                 self.assertEqual(body["intent"], RESUME_INTENT_APPROVE)
                 self.assertEqual(body["external_actor_id"], "approver-1")
+                self.assertEqual(body["resume_id"], "resume-approve")
+                self.assertEqual(body["interaction_id"], "interaction-1")
             else:
                 self.assertEqual(body["intent"], RESUME_INTENT_REQUEST_CHANGES)
                 self.assertEqual(body["content"], "revise")
@@ -251,7 +256,12 @@ class ClientTests(unittest.TestCase):
             "run-1",
             AppendMessageRequest(role="user", content="hello", external_actor_id="user-1"),
         )
-        approved = client.approve_run("run-1", external_actor_id="approver-1")
+        approved = client.approve_run(
+            "run-1",
+            external_actor_id="approver-1",
+            resume_id="resume-approve",
+            interaction_id="interaction-1",
+        )
         changed = client.request_changes("run-1", "revise", external_actor_id="reviewer-1")
 
         self.assertEqual(message.id, "msg-1")
@@ -349,8 +359,11 @@ class ClientTests(unittest.TestCase):
             "app-a",
             client=httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(404, json={"error": "missing"}))),
         )
-        with self.assertRaisesRegex(AgentRuntimeError, "missing"):
+        with self.assertRaisesRegex(AgentRuntimeHTTPError, "missing") as raised:
             client.get_run("missing")
+        self.assertEqual(raised.exception.status_code, 404)
+        self.assertTrue(raised.exception.client_error)
+        self.assertEqual(raised.exception.method, "GET")
 
     def test_transport_errors_surface_as_agent_runtime_errors(self):
         def handler(request):
@@ -401,6 +414,14 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(tool_call.input["q"], "term")
         self.assertEqual(result.content[0].text, "ok")
 
+        resume = ResumeRunRequest(
+            intent="reply",
+            resume_id="resume-1",
+            interaction_id="interaction-1",
+        )
+        self.assertEqual(resume.resume_id, "resume-1")
+        self.assertEqual(resume.interaction_id, "interaction-1")
+
         lookup = SkillLookupRequest(app_id="app-a", key="review_agent")
         skill = WorkspaceSkill(
             id="skill-1",
@@ -417,26 +438,37 @@ class ClientTests(unittest.TestCase):
         cfg = AppConfig(apps=[{
             "app_id": "host_app",
             "context_endpoint": "https://host.internal/agent-runtime/target-context",
+            "context_token_env": "CONTEXT_TOKEN",
+            "event_callbacks": [{
+                "url": "https://host.internal/agent-runtime/events",
+                "token_env": "EVENT_TOKEN",
+                "event_types": ["run.completed"],
+            }],
             "mcp_providers": [{
                 "name": "content",
                 "transport": "streamable_http",
                 "url": "https://host.internal/mcp",
+                "token_env": "MCP_TOKEN",
                 "tool_prefix": "content",
                 "allowed_tools": ["search_articles"],
             }],
             "command_provider": {
                 "transport": "http",
                 "base_url": "https://host.internal/agent-runtime/commands",
+                "token_env": "COMMAND_TOKEN",
             },
             "workspace_provider": {
                 "transport": "repository",
                 "base_url": "https://host.internal/agent-runtime/workspaces",
                 "root_dir": "/tmp/agent-runtime-workspaces",
+                "token_env": "WORKSPACE_TOKEN",
             },
             "skill_provider": {
                 "transport": "http",
                 "base_url": "https://host.internal/agent-runtime/skills",
                 "package_base_url": "https://host.internal/agent-runtime/skill-packages",
+                "token_env": "SKILL_TOKEN",
+                "package_token_env": "PACKAGE_TOKEN",
             },
         }])
         self.assertEqual(cfg.apps[0].mcp_providers[0].allowed_tools, ["search_articles"])
@@ -445,13 +477,12 @@ class ClientTests(unittest.TestCase):
         except AttributeError:
             payload = cfg.dict(exclude_none=True)
         self.assertEqual(payload["apps"][0]["workspace_provider"]["transport"], "repository")
+        self.assertEqual(payload["apps"][0]["context_token_env"], "CONTEXT_TOKEN")
+        self.assertEqual(payload["apps"][0]["event_callbacks"][0]["event_types"], ["run.completed"])
+        self.assertEqual(payload["apps"][0]["skill_provider"]["package_token_env"], "PACKAGE_TOKEN")
 
         default_cfg = MCPProviderConfig(name="content", url="https://host.internal/agent-runtime/mcp/content")
         self.assertEqual(default_cfg.transport, "http")
-
-    def test_fastapi_helpers_require_optional_dependency(self):
-        with self.assertRaisesRegex(RuntimeError, r"agent-runtime\[fastapi\]"):
-            create_fastapi_mcp_provider_router(lambda: [], lambda request: ToolResult())
 
     def test_verify_bearer_token(self):
         verify_bearer_token("Bearer secret", "secret")
@@ -507,6 +538,94 @@ class ClientTests(unittest.TestCase):
     def test_event_envelope_requires_identity(self):
         with self.assertRaisesRegex(ValueError, "requires app_id"):
             parse_event_envelope({"type": "run.completed"})
+
+    def test_codex_auth_event_contract(self):
+        envelope = parse_event_envelope({
+            "event_id": "event-auth",
+            "app_id": "app-a",
+            "run_id": "run-1",
+            "type": EVENT_CODEX_AUTH_STATE_CHANGED,
+            "data": {
+                "provider": "openai",
+                "auth_mode": "chatgpt_device_code",
+                "state": "pending",
+                "verification_url": "https://example.test/device",
+                "user_code": "ABCD",
+            },
+        })
+        state, ok = envelope.codex_auth_state()
+        self.assertTrue(ok)
+        self.assertEqual(state.state, "pending")
+        self.assertEqual(state.user_code, "ABCD")
+
+    def test_observability_methods_and_sse_stream(self):
+        def handler(request):
+            path = request.url.path
+            if path == "/v1/capabilities":
+                return httpx.Response(200, json={
+                    "runtime_kinds": ["native_sdk"],
+                    "providers": [],
+                    "store": {"driver": "memory", "in_memory": True},
+                    "durable": {"enabled": False},
+                    "tools": [],
+                })
+            if path == "/v1/app-health":
+                return httpx.Response(200, json={"app_id": "app-a", "components": []})
+            if path == "/v1/runs/search":
+                self.assertEqual(request.url.params["q"], "repo")
+                self.assertEqual(request.url.params["limit"], "10")
+                return httpx.Response(200, json={"items": [run_payload()], "total": 1, "limit": 10, "offset": 0})
+            if path.endswith("/events/history"):
+                return httpx.Response(200, json=[{
+                    "event_id": "event-1",
+                    "app_id": "app-a",
+                    "run_id": "run-1",
+                    "type": "run.completed",
+                }])
+            if path.endswith("/execution"):
+                return httpx.Response(200, json={
+                    "execution_mode": "durable",
+                    "state": "running",
+                    "workflow_id": "workflow-1",
+                })
+            if path.endswith("/events"):
+                return httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    text=(
+                        ": connected\n\n"
+                        "event: run.started\n"
+                        "data: {\"event_id\":\"event-1\",\"app_id\":\"app-a\",\"run_id\":\"run-1\",\"type\":\"run.started\"}\n\n"
+                        "event: run.completed\n"
+                        "data: {\"event_id\":\"event-2\",\"app_id\":\"app-a\",\"run_id\":\"run-1\"}\n\n"
+                    ),
+                )
+            return httpx.Response(404, json={"error": "unexpected route"})
+
+        client = AgentRuntimeClient(
+            "https://runtime.internal",
+            "app-a",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        self.assertEqual(client.get_capabilities().store.driver, "memory")
+        self.assertEqual(client.get_app_health().app_id, "app-a")
+        self.assertEqual(client.search_runs(query="repo", limit=10).total, 1)
+        self.assertEqual(client.list_run_events("run-1")[0].event_id, "event-1")
+        self.assertEqual(client.get_run_execution("run-1").workflow_id, "workflow-1")
+        events = list(client.iter_run_events("run-1"))
+        self.assertEqual([event.type for event in events], ["run.started", "run.completed"])
+
+    def test_client_escapes_path_identifiers(self):
+        def handler(request):
+            self.assertIn(b"run%2Fwith%20spaces", request.url.raw_path)
+            return httpx.Response(200, json=run_payload("run/with spaces"))
+
+        client = AgentRuntimeClient(
+            "https://runtime.internal",
+            "app-a",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        self.assertEqual(client.get_run("run/with spaces").id, "run/with spaces")
 
 
 if __name__ == "__main__":

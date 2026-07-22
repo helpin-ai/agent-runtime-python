@@ -1,6 +1,6 @@
 [project]
 name = "agent-runtime"
-version = "0.2.1"
+version = "0.3.0"
 description = "Python client and adapter helpers for the Agent Runtime service"
 readme = "README.md"
 authors = [{ name = "Helpin AI" }]
@@ -15,7 +15,15 @@ Repository = "https://github.com/helpin-ai/agent-runtime-python"
 
 [project.optional-dependencies]
 fastapi = ["fastapi>=0.110"]
+nats = ["nats-py>=2.9"]
+all = ["fastapi>=0.110", "nats-py>=2.9"]
+test = ["fastapi>=0.110", "nats-py>=2.9", "pytest>=8"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["agent_runtime*"]
+
+[tool.pytest.ini_options]
+markers = [
+  "optional: exercises FastAPI and NATS optional integrations",
+]
