@@ -13,6 +13,7 @@ from agent_runtime import create_fastapi_event_callback_router
 from agent_runtime.events import EventEnvelope
 from agent_runtime.nats import (
     DEFAULT_NATS_STREAM_NAME,
+    DEFAULT_NATS_V2_SUBJECT_TEMPLATE,
     DropEvent,
     NATSConsumer,
     NATSConsumerConfig,
@@ -22,6 +23,8 @@ from agent_runtime.nats import (
     nats_app_token,
     nats_token,
     render_nats_subject,
+    render_nats_v2_subject,
+    v2_app_event_subject,
 )
 
 pytestmark = pytest.mark.optional
@@ -96,7 +99,10 @@ def test_nats_subject_helpers_and_defaults():
     assert nats_token("run/1") == "run_1"
     assert nats_app_token("helpin.stage") == "helpin_stage"
     assert app_event_subject("helpin.stage") == "agent-runtime.events.helpin_stage.>"
+    assert v2_app_event_subject("helpin.stage") == "agent-runtime.events.v2.helpin_stage.>"
     assert render_nats_subject("", event) == "agent-runtime.events.helpin_stage.run_1.run.completed"
+    assert DEFAULT_NATS_V2_SUBJECT_TEMPLATE == "agent-runtime.events.v2.{app_id}.{run_id}.{event_type}"
+    assert render_nats_v2_subject(event) == "agent-runtime.events.v2.helpin_stage.run_1.run.completed"
 
     config = NATSConsumerConfig(app_id="helpin")
     assert config.stream == DEFAULT_NATS_STREAM_NAME

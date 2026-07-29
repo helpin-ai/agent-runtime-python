@@ -26,7 +26,10 @@ from .models import (
     ToolCall,
 )
 from .constants import RESUME_INTENT_APPROVE, RESUME_INTENT_REQUEST_CHANGES
-from .events import EventEnvelope, parse_event_envelope
+from .events import EventEnvelope, EventListResponse, StreamStateSnapshot, parse_event_envelope
+
+
+EVENT_PROTOCOL_HEADER = "X-Agent-Runtime-Event-Protocol"
 
 
 class AgentRuntimeError(RuntimeError):
@@ -60,12 +63,14 @@ class AgentRuntimeClient:
         app_id: str,
         service_token: Optional[str] = None,
         client: Optional[httpx.Client] = None,
+        event_protocol: Optional[str] = None,
     ) -> None:
         self.base_url = base_url.strip().rstrip("/")
         if not self.base_url:
             raise ValueError("agent runtime base URL is required")
         self.app_id = app_id.strip()
         self.service_token = service_token
+        self.event_protocol = (event_protocol or "").strip().lower() or None
         self.client = client or httpx.Client(timeout=30.0)
 
     def close(self) -> None:
@@ -245,6 +250,29 @@ class AgentRuntimeClient:
         )
         return [EventEnvelope(**item) for item in data]
 
+    def list_v2_events(self, run_id: str, after_sequence: int = 0) -> EventListResponse:
+        """Return durable ordered v2 events after a per-run sequence cursor."""
+
+        params: Dict[str, Any] = self._app_params()
+        if after_sequence > 0:
+            params["after_sequence"] = after_sequence
+        data = self._request(
+            "GET",
+            self._v2_run_path(run_id, "/events"),
+            params=params,
+        )
+        return EventListResponse(**data)
+
+    def get_v2_stream_state(self, run_id: str) -> StreamStateSnapshot:
+        """Return the authoritative materialized v2 stream snapshot."""
+
+        data = self._request(
+            "GET",
+            self._v2_run_path(run_id, "/stream-state"),
+            params=self._app_params(),
+        )
+        return StreamStateSnapshot(**data)
+
     def get_run_execution(self, run_id: str) -> RunExecutionInfo:
         data = self._request(
             "GET",
@@ -416,6 +444,8 @@ class AgentRuntimeClient:
         result = dict(headers or {})
         if self.service_token and "Authorization" not in result:
             result["Authorization"] = f"Bearer {self.service_token}"
+        if self.event_protocol:
+            result[EVENT_PROTOCOL_HEADER] = self.event_protocol
         return result
 
     def _app_params(self) -> Dict[str, str]:
@@ -426,6 +456,9 @@ class AgentRuntimeClient:
 
     def _run_path(self, run_id: str, suffix: str = "") -> str:
         return f"/v1/runs/{self._path_id(run_id)}{suffix}"
+
+    def _v2_run_path(self, run_id: str, suffix: str = "") -> str:
+        return f"/v2/runs/{self._path_id(run_id)}{suffix}"
 
     def _dump(self, value: Any) -> Dict[str, Any]:
         if isinstance(value, dict):

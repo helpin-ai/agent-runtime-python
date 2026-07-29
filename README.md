@@ -30,6 +30,31 @@ for event in client.iter_run_events(run.id):
     print(event.sequence_no, event.type)
 ```
 
+The durable v2 event contract is opt-in. Existing clients omit the protocol
+header and continue to use v1 unchanged. Hosts can opt in when their Agent
+Runtime app configuration is ready for v2:
+
+```python
+from agent_runtime import AgentRuntimeClient
+
+client = AgentRuntimeClient(
+    base_url="https://agent-runtime.internal",
+    app_id="host_app",
+    service_token="service-token",
+    event_protocol="v2",
+)
+
+replay = client.list_v2_events(run.id, after_sequence=last_sequence)
+for event in replay.events:
+    print(event.sequence_no, event.segment_id, event.data)
+
+snapshot = client.get_v2_stream_state(run.id)
+print(snapshot.through_sequence, snapshot.state)
+```
+
+For JetStream consumers, use `v2_app_event_subject(app_id)` with a separate
+durable consumer. The existing `NATSConsumerConfig` defaults remain on v1.
+
 Codex ChatGPT device-code auth can be driven through the SDK when a Codex run
 pauses for authentication.
 
