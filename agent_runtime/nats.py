@@ -12,6 +12,7 @@ from .events import EventEnvelope, parse_event_envelope
 DEFAULT_NATS_STREAM_NAME = "AGENT_RUNTIME_EVENTS"
 DEFAULT_NATS_STREAM_SUBJECT = "agent-runtime.events.>"
 DEFAULT_NATS_SUBJECT_TEMPLATE = "agent-runtime.events.{app_id}.{run_id}.{event_type}"
+DEFAULT_NATS_V2_SUBJECT_TEMPLATE = "agent-runtime.events.v2.{app_id}.{run_id}.{event_type}"
 
 
 class RetryEvent(Exception):
@@ -210,6 +211,12 @@ def app_event_subject(app_id: str) -> str:
     return f"agent-runtime.events.{nats_app_token(app_id)}.>"
 
 
+def v2_app_event_subject(app_id: str) -> str:
+    """Return the isolated v2 subject family for one host app."""
+
+    return f"agent-runtime.events.v2.{nats_app_token(app_id)}.>"
+
+
 def render_nats_subject(template: str, event: EventEnvelope) -> str:
     value = template.strip() or DEFAULT_NATS_SUBJECT_TEMPLATE
     return (
@@ -218,6 +225,12 @@ def render_nats_subject(template: str, event: EventEnvelope) -> str:
         .replace("{event_type}", nats_token(event.type))
         .replace("{type}", nats_token(event.type))
     )
+
+
+def render_nats_v2_subject(event: EventEnvelope) -> str:
+    """Render an event on the versioned v2 subject family."""
+
+    return render_nats_subject(DEFAULT_NATS_V2_SUBJECT_TEMPLATE, event)
 
 
 def nats_token(value: str) -> str:

@@ -39,6 +39,11 @@ class EventEnvelope(BaseModel):
     app_id: str = ""
     run_id: str = ""
     host_run_id: Optional[str] = None
+    schema_version: str = ""
+    turn_id: str = ""
+    segment_id: str = ""
+    revision: int = 0
+    base_revision: int = 0
     type: str = ""
     data: Dict[str, Any] = Field(default_factory=dict)
 
@@ -140,6 +145,23 @@ class CodexAuthStateEventData(BaseModel):
     user_code: Optional[str] = None
     plan_type: Optional[str] = None
     error: Optional[str] = None
+
+
+class StreamStateSnapshot(BaseModel):
+    """Authoritative materialized state for a v2 run stream."""
+
+    schema_version: str
+    run_id: str
+    through_sequence: int
+    state: Dict[str, Any] = Field(default_factory=dict)
+
+
+class EventListResponse(BaseModel):
+    """Durable ordered v2 events and the replay cursor that follows them."""
+
+    events: List[EventEnvelope] = Field(default_factory=list)
+    next_sequence_no: int = 0
+    stream_state_snapshot: Optional[StreamStateSnapshot] = None
 
 
 def parse_event_envelope(payload: bytes | str | Dict[str, Any]) -> EventEnvelope:

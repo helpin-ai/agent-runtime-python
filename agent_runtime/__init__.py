@@ -9,16 +9,23 @@ from .adapter import (
     verify_bearer_token,
 )
 from . import constants as constants
-from .client import AgentRuntimeClient, AgentRuntimeError, AgentRuntimeHTTPError
+from .client import (
+    EVENT_PROTOCOL_HEADER,
+    AgentRuntimeClient,
+    AgentRuntimeError,
+    AgentRuntimeHTTPError,
+)
 from .constants import *  # noqa: F403
 from .events import (
     AssistantMessageEventData,
     CodexAuthStateEventData,
     Event,
     EventEnvelope,
+    EventListResponse,
     PlanUpdatedEventData,
     ReasoningMessageEventData,
     RunPlanStep,
+    StreamStateSnapshot,
     ToolCallEventData,
     UsageCheckpointEventData,
     parse_event_envelope,
@@ -84,6 +91,7 @@ from .nats import (
     DEFAULT_NATS_STREAM_NAME,
     DEFAULT_NATS_STREAM_SUBJECT,
     DEFAULT_NATS_SUBJECT_TEMPLATE,
+    DEFAULT_NATS_V2_SUBJECT_TEMPLATE,
     DropEvent,
     NATSConsumer,
     NATSConsumerConfig,
@@ -93,6 +101,8 @@ from .nats import (
     nats_app_token,
     nats_token,
     render_nats_subject,
+    render_nats_v2_subject,
+    v2_app_event_subject,
 )
 
 __all__ = [
@@ -120,9 +130,11 @@ __all__ = [
     "CommandExecutionRequest",
     "CommandExecutionResponse",
     "DurableInfo",
+    "EVENT_PROTOCOL_HEADER",
     "DEFAULT_NATS_STREAM_NAME",
     "DEFAULT_NATS_STREAM_SUBJECT",
     "DEFAULT_NATS_SUBJECT_TEMPLATE",
+    "DEFAULT_NATS_V2_SUBJECT_TEMPLATE",
     "DropEvent",
     "EventCallbackConfig",
     "FinalizeWorkspaceRequest",
@@ -132,6 +144,7 @@ __all__ = [
     "InteractionTransport",
     "Event",
     "EventEnvelope",
+    "EventListResponse",
     "MCPProviderConfig",
     "NATSConsumer",
     "NATSConsumerConfig",
@@ -170,6 +183,7 @@ __all__ = [
     "WorkspaceSkill",
     "ProviderCapability",
     "StoreInfo",
+    "StreamStateSnapshot",
     "create_fastapi_command_executor_router",
     "create_fastapi_event_callback_router",
     "create_fastapi_skill_package_router",
@@ -183,6 +197,8 @@ __all__ = [
     "nats_token",
     "parse_event_envelope",
     "render_nats_subject",
+    "render_nats_v2_subject",
+    "v2_app_event_subject",
     "verify_bearer_token",
 ]
 

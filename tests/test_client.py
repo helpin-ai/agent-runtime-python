@@ -25,10 +25,17 @@ from agent_runtime import (
     TURN_POLICY_PAUSE_AFTER_ASSISTANT,
     USAGE_SEMANTIC_CUMULATIVE,
     AppendMessageRequest,
+    DEFAULT_NATS_V2_SUBJECT_TEMPLATE,
+    EVENT_PROTOCOL_HEADER,
+    EVENT_SCHEMA_VERSION_V2,
     EventEnvelope,
+    EventListResponse,
     EVENT_CODEX_AUTH_STATE_CHANGED,
+    StreamStateSnapshot,
     Usage,
+    render_nats_v2_subject,
     parse_event_envelope,
+    v2_app_event_subject,
     WorkspaceSkill,
     verify_bearer_token,
 )
@@ -87,6 +94,7 @@ class ClientTests(unittest.TestCase):
         def handler(request):
             calls.append(request)
             self.assertEqual(request.headers["authorization"], "Bearer secret")
+            self.assertNotIn(EVENT_PROTOCOL_HEADER, request.headers)
             self.assertEqual(request.url.path, "/v1/runs")
             self.assertEqual(request.url.params["app_id"], "app-a")
             return httpx.Response(200, json=[run_payload()])
@@ -103,6 +111,20 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].id, "run-1")
         self.assertEqual(len(calls), 1)
+
+    def test_client_sends_opt_in_v2_protocol_header(self):
+        def handler(request):
+            self.assertEqual(request.headers[EVENT_PROTOCOL_HEADER], "v2")
+            return httpx.Response(202, json=run_payload())
+
+        client = AgentRuntimeClient(
+            "https://runtime.internal",
+            "app-a",
+            event_protocol=" V2 ",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+
+        self.assertEqual(client.start_run({"agent_id": "agent-1"}).id, "run-1")
 
     def test_start_run_defaults_app_id(self):
         def handler(request):
@@ -538,6 +560,107 @@ class ClientTests(unittest.TestCase):
     def test_event_envelope_requires_identity(self):
         with self.assertRaisesRegex(ValueError, "requires app_id"):
             parse_event_envelope({"type": "run.completed"})
+
+    def test_v2_event_envelope_preserves_metadata_and_delta_whitespace(self):
+        envelope = parse_event_envelope({
+            "event_id": "event-v2",
+            "app_id": "app-a",
+            "run_id": "run-1",
+            "schema_version": EVENT_SCHEMA_VERSION_V2,
+            "sequence_no": 7,
+            "turn_id": "turn-1",
+            "segment_id": "message-1",
+            "revision": 3,
+            "base_revision": 2,
+            "type": "assistant_message_delta",
+            "data": {
+                "message_id": "message-1",
+                "text": " world",
+                "content": " world",
+            },
+        })
+
+        self.assertEqual(envelope.schema_version, "2")
+        self.assertEqual(envelope.sequence_no, 7)
+        self.assertEqual(envelope.turn_id, "turn-1")
+        self.assertEqual(envelope.segment_id, "message-1")
+        self.assertEqual(envelope.revision, 3)
+        self.assertEqual(envelope.base_revision, 2)
+        assistant, ok = envelope.assistant_message()
+        self.assertTrue(ok)
+        self.assertEqual(assistant.text, " world")
+        self.assertEqual(assistant.content, " world")
+
+    def test_v2_replay_and_stream_state_methods(self):
+        requests = []
+        snapshot = {
+            "schema_version": "2",
+            "run_id": "run/with spaces",
+            "through_sequence": 7,
+            "state": {
+                "events": [{
+                    "event_id": "event-v2",
+                    "app_id": "app-a",
+                    "run_id": "run/with spaces",
+                    "schema_version": "2",
+                    "sequence_no": 7,
+                    "turn_id": "turn-1",
+                    "segment_id": "message-1",
+                    "revision": 1,
+                    "type": "assistant_message_delta",
+                    "data": {"message_id": "message-1", "content": " next"},
+                }],
+            },
+        }
+
+        def handler(request):
+            requests.append(request)
+            self.assertEqual(request.headers[EVENT_PROTOCOL_HEADER], "v2")
+            self.assertEqual(request.url.params["app_id"], "app-a")
+            if request.url.path.endswith("/events"):
+                self.assertEqual(request.url.params["after_sequence"], "4")
+                return httpx.Response(200, json={
+                    "events": snapshot["state"]["events"],
+                    "next_sequence_no": 7,
+                    "stream_state_snapshot": snapshot,
+                })
+            return httpx.Response(200, json=snapshot)
+
+        client = AgentRuntimeClient(
+            "https://runtime.internal",
+            "app-a",
+            event_protocol="v2",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        replay = client.list_v2_events("run/with spaces", after_sequence=4)
+        state = client.get_v2_stream_state("run/with spaces")
+
+        self.assertIsInstance(replay, EventListResponse)
+        self.assertEqual(replay.next_sequence_no, 7)
+        self.assertEqual(replay.events[0].segment_id, "message-1")
+        self.assertEqual(replay.events[0].data["content"], " next")
+        self.assertIsInstance(replay.stream_state_snapshot, StreamStateSnapshot)
+        self.assertIsInstance(state, StreamStateSnapshot)
+        self.assertEqual(state.through_sequence, 7)
+        self.assertEqual(len(requests), 2)
+        self.assertTrue(all(b"run%2Fwith%20spaces" in request.url.raw_path for request in requests))
+
+    def test_v2_nats_subject_helpers_match_go_sdk_contract(self):
+        event = EventEnvelope(
+            app_id="helpin.stage",
+            run_id="run/1",
+            type="assistant_message_delta",
+        )
+
+        self.assertEqual(
+            DEFAULT_NATS_V2_SUBJECT_TEMPLATE,
+            "agent-runtime.events.v2.{app_id}.{run_id}.{event_type}",
+        )
+        self.assertEqual(v2_app_event_subject("helpin.stage"), "agent-runtime.events.v2.helpin_stage.>")
+        self.assertEqual(
+            render_nats_v2_subject(event),
+            "agent-runtime.events.v2.helpin_stage.run_1.assistant_message_delta",
+        )
 
     def test_codex_auth_event_contract(self):
         envelope = parse_event_envelope({
