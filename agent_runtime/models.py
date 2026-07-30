@@ -354,6 +354,27 @@ class CodexAuthState(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class RunMCPTool(BaseModel):
+    name: str
+    access: str
+
+
+class RunMCPCredential(BaseModel):
+    type: str
+    access_token: Optional[str] = None
+    headers: Dict[str, str] = Field(default_factory=dict)
+    expires_at: Optional[datetime] = None
+
+
+class RunMCPServer(BaseModel):
+    server_id: str
+    server_name: str
+    transport: str = "streamable_http"
+    url: str
+    tools: List[RunMCPTool]
+    credential: Optional[RunMCPCredential] = None
+
+
 class StartRunRequest(BaseModel):
     app_id: str = ""
     host_run_id: Optional[str] = None
@@ -367,6 +388,7 @@ class StartRunRequest(BaseModel):
     trigger: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     turn_policy: TurnPolicy = Field(default_factory=TurnPolicy)
+    mcp_servers: List[RunMCPServer] = Field(default_factory=list)
 
 
 class ResumeRunRequest(BaseModel):
@@ -433,6 +455,12 @@ class AppSummary(BaseModel):
     components: List[AppComponent] = Field(default_factory=list)
 
 
+class RunMCPCapability(BaseModel):
+    supported: bool = False
+    transports: List[str] = Field(default_factory=list)
+    credential_encryption_configured: bool = False
+
+
 class Capabilities(BaseModel):
     runtime_kinds: List[str] = Field(default_factory=list)
     providers: List[ProviderCapability] = Field(default_factory=list)
@@ -442,6 +470,7 @@ class Capabilities(BaseModel):
     apps: List[AppSummary] = Field(default_factory=list)
     service_auth_enabled: bool = False
     tools: List[ToolDefinition] = Field(default_factory=list)
+    run_mcp: RunMCPCapability = Field(default_factory=RunMCPCapability)
 
 
 class RunPage(BaseModel):

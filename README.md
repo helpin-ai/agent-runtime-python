@@ -18,6 +18,35 @@ run = client.start_run({
 })
 ```
 
+Apps can attach workspace-selected remote MCP servers to one run. The app owns
+installation and OAuth, refreshes or exchanges the workspace credential, then
+sends only the short-lived credential needed by that run.
+
+```python
+from agent_runtime import RunMCPCredential, RunMCPServer, RunMCPTool, StartRunRequest
+
+run = client.start_run(StartRunRequest(
+    agent_id="agent_123",
+    target={"type": "workspace", "id": "workspace_123"},
+    mcp_servers=[RunMCPServer(
+        server_id="workspace_mcp_456",
+        server_name="github",
+        url="https://mcp.example.com/mcp",
+        tools=[
+            RunMCPTool(name="get_issue", access="read"),
+            RunMCPTool(name="create_issue", access="write"),
+        ],
+        credential=RunMCPCredential(
+            type="bearer_token",
+            access_token=short_lived_access_token,
+            expires_at=expires_at,
+        ),
+    )],
+))
+```
+
+MCP credentials are request-only and are not included in the returned run.
+
 Runtime diagnostics, paginated run search, persisted event history, execution
 details, and live Server-Sent Events are exposed as typed helpers.
 

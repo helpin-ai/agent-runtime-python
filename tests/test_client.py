@@ -11,9 +11,15 @@ from agent_runtime import (
     AppConfig,
     CommandExecutionRequest,
     MCPProviderConfig,
+    MCP_CREDENTIAL_BEARER_TOKEN,
+    MCP_TOOL_ACCESS_READ,
+    MCP_TRANSPORT_STREAMABLE_HTTP,
     PrepareWorkspaceRequest,
     RepositoryWorkspaceSpec,
     ResumeRunRequest,
+    RunMCPCredential,
+    RunMCPServer,
+    RunMCPTool,
     RESUME_INTENT_APPROVE,
     RESUME_INTENT_REQUEST_CHANGES,
     SkillLookupRequest,
@@ -132,6 +138,7 @@ class ClientTests(unittest.TestCase):
             self.assertEqual(body["app_id"], "app-a")
             self.assertEqual(body["host_run_id"], "host-1")
             self.assertEqual(body["turn_policy"]["mode"], TURN_POLICY_PAUSE_AFTER_ASSISTANT)
+            self.assertEqual(body["mcp_servers"][0]["credential"]["access_token"], "run-token")
             return httpx.Response(202, json=run_payload())
 
         client = AgentRuntimeClient(
@@ -144,8 +151,17 @@ class ClientTests(unittest.TestCase):
             agent_id="agent-1",
             target={"type": "ticket", "id": "T-1"},
             turn_policy={"mode": TURN_POLICY_PAUSE_AFTER_ASSISTANT},
+            mcp_servers=[RunMCPServer(
+                server_id="workspace-mcp-1",
+                server_name="github",
+                transport=MCP_TRANSPORT_STREAMABLE_HTTP,
+                url="https://mcp.example.com/mcp",
+                tools=[RunMCPTool(name="get_issue", access=MCP_TOOL_ACCESS_READ)],
+                credential=RunMCPCredential(type=MCP_CREDENTIAL_BEARER_TOKEN, access_token="run-token"),
+            )],
         ))
         self.assertEqual(run.id, "run-1")
+        self.assertNotIn("run-token", run.model_dump_json() if hasattr(run, "model_dump_json") else run.json())
 
     def test_agent_get_update_and_upsert(self):
         calls = []
