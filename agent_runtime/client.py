@@ -18,12 +18,14 @@ from .models import (
     Capabilities,
     CodexAuthState,
     ResumeRunRequest,
+    RunMCPCredentialUpdate,
     RunExecutionInfo,
     RunPage,
     StartRunRequest,
     ToolDefinition,
     ToolResult,
     ToolCall,
+    UpdateRunMCPCredentialRequest,
 )
 from .constants import RESUME_INTENT_APPROVE, RESUME_INTENT_REQUEST_CHANGES
 from .events import EventEnvelope, EventListResponse, StreamStateSnapshot, parse_event_envelope
@@ -141,6 +143,24 @@ class AgentRuntimeClient:
     def get_run(self, run_id: str) -> AgentRun:
         data = self._request("GET", self._run_path(run_id), params=self._app_params())
         return AgentRun(**data)
+
+    def update_run_mcp_credential(
+        self,
+        run_id: str,
+        server_id: str,
+        request: UpdateRunMCPCredentialRequest | Dict[str, Any],
+    ) -> RunMCPCredentialUpdate:
+        """Replace only the credential for one MCP server on an active run."""
+        data = self._request(
+            "PUT",
+            self._run_path(
+                run_id,
+                f"/mcp-servers/{self._path_id(server_id)}/credential",
+            ),
+            params=self._app_params(),
+            json=self._dump(request),
+        )
+        return RunMCPCredentialUpdate(**data)
 
     def list_runs(self) -> List[AgentRun]:
         data = self._request("GET", "/v1/runs", params={"app_id": self.app_id})

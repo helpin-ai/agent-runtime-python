@@ -19,8 +19,37 @@ run = client.start_run({
 ```
 
 Apps can attach workspace-selected remote MCP servers to one run. The app owns
-installation and OAuth, refreshes or exchanges the workspace credential, then
-sends only the short-lived credential needed by that run.
+installation and OAuth. The optional headless OAuth helper prevents apps from
+reimplementing MCP discovery, PKCE, dynamic registration, exchange, and
+refresh. The app still supplies workspace/user authorization, callback routes,
+encrypted state and refresh-token storage, tool policy, and notifications.
+
+```python
+from agent_runtime import MCPOAuthClient, hash_mcp_oauth_state
+
+oauth_client = MCPOAuthClient(
+    installation.endpoint_url,
+    allowed_hosts=["login.provider.example"],
+)
+configuration = oauth_client.discover()
+registration = oauth_client.register(
+    configuration.authorization.registration_endpoint,
+    callback_url,
+)
+authorization = oauth_client.new_authorization_request(
+    configuration,
+    registration.client_id,
+    callback_url,
+    installation.scopes,
+)
+
+# Persist hash_mcp_oauth_state(authorization.state), an encrypted verifier,
+# and its user/workspace/server binding before redirecting the browser.
+```
+
+At callback, consume the state atomically and call `exchange_code`. Use
+`refresh` under an installation-level lock before runs and persist any rotated
+refresh token before sending only the access token to Runtime.
 
 ```python
 from agent_runtime import RunMCPCredential, RunMCPServer, RunMCPTool, StartRunRequest
@@ -46,6 +75,23 @@ run = client.start_run(StartRunRequest(
 ```
 
 MCP credentials are request-only and are not included in the returned run.
+
+Keep OAuth refresh tokens in your app. Before resuming a run paused for MCP
+authentication, replace only its short-lived access credential:
+
+```python
+client.update_run_mcp_credential(
+    run.id,
+    "workspace_mcp_456",
+    UpdateRunMCPCredentialRequest(
+        credential=RunMCPCredential(
+            type="bearer_token",
+            access_token=access_token,
+            expires_at=expires_at,
+        )
+    ),
+)
+```
 
 Runtime diagnostics, paginated run search, persisted event history, execution
 details, and live Server-Sent Events are exposed as typed helpers.

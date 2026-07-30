@@ -366,6 +366,17 @@ class RunMCPCredential(BaseModel):
     expires_at: Optional[datetime] = None
 
 
+class UpdateRunMCPCredentialRequest(BaseModel):
+    credential: RunMCPCredential
+
+
+class RunMCPCredentialUpdate(BaseModel):
+    run_id: str
+    server_id: str
+    expires_at: Optional[datetime] = None
+    updated_at: datetime
+
+
 class RunMCPServer(BaseModel):
     server_id: str
     server_name: str

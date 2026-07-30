@@ -18,6 +18,7 @@ from agent_runtime import (
     RepositoryWorkspaceSpec,
     ResumeRunRequest,
     RunMCPCredential,
+    UpdateRunMCPCredentialRequest,
     RunMCPServer,
     RunMCPTool,
     RESUME_INTENT_APPROVE,
@@ -162,6 +163,40 @@ class ClientTests(unittest.TestCase):
         ))
         self.assertEqual(run.id, "run-1")
         self.assertNotIn("run-token", run.model_dump_json() if hasattr(run, "model_dump_json") else run.json())
+
+    def test_update_run_mcp_credential(self):
+        def handler(request):
+            self.assertEqual(request.method, "PUT")
+            self.assertEqual(
+                request.url.path,
+                "/v1/runs/run-1/mcp-servers/customer:io/credential",
+            )
+            self.assertEqual(request.url.params["app_id"], "app-a")
+            body = json.loads(request.content)
+            self.assertEqual(body["credential"]["access_token"], "rotated-secret")
+            return httpx.Response(200, json={
+                "run_id": "run-1",
+                "server_id": "customer:io",
+                "expires_at": "2026-07-30T20:00:00Z",
+                "updated_at": "2026-07-30T19:00:00Z",
+            })
+
+        client = AgentRuntimeClient(
+            "https://runtime.internal",
+            "app-a",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        result = client.update_run_mcp_credential(
+            "run-1",
+            "customer:io",
+            UpdateRunMCPCredentialRequest(credential=RunMCPCredential(
+                type=MCP_CREDENTIAL_BEARER_TOKEN,
+                access_token="rotated-secret",
+            )),
+        )
+        self.assertEqual(result.server_id, "customer:io")
+        serialized = result.model_dump_json() if hasattr(result, "model_dump_json") else result.json()
+        self.assertNotIn("rotated-secret", serialized)
 
     def test_agent_get_update_and_upsert(self):
         calls = []
