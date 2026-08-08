@@ -164,6 +164,20 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(run.id, "run-1")
         self.assertNotIn("run-token", run.model_dump_json() if hasattr(run, "model_dump_json") else run.json())
 
+    def test_run_mcp_models_reject_unsupported_contract_values(self):
+        with self.assertRaises(ValueError):
+            RunMCPTool(name="delete_everything", access="admin")
+        with self.assertRaises(ValueError):
+            RunMCPCredential(type="basic", access_token="secret")
+        with self.assertRaises(ValueError):
+            RunMCPServer(
+                server_id="server-1",
+                server_name="example",
+                transport="stdio",
+                url="https://mcp.example.com/mcp",
+                tools=[RunMCPTool(name="read", access="read")],
+            )
+
     def test_update_run_mcp_credential(self):
         def handler(request):
             self.assertEqual(request.method, "PUT")
