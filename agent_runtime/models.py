@@ -383,6 +383,7 @@ class RunMCPServer(BaseModel):
     transport: Literal["streamable_http"] = "streamable_http"
     url: str
     tools: List[RunMCPTool]
+    skills: List[SkillRef] = Field(default_factory=list)
     credential: Optional[RunMCPCredential] = None
 
 

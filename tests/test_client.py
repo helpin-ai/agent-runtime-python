@@ -22,6 +22,7 @@ from agent_runtime import (
     RunMCPServer,
     RunMCPTool,
     RESUME_INTENT_APPROVE,
+    SkillRef,
     RESUME_INTENT_REQUEST_CHANGES,
     SkillLookupRequest,
     StartRunRequest,
@@ -140,6 +141,7 @@ class ClientTests(unittest.TestCase):
             self.assertEqual(body["host_run_id"], "host-1")
             self.assertEqual(body["turn_policy"]["mode"], TURN_POLICY_PAUSE_AFTER_ASSISTANT)
             self.assertEqual(body["mcp_servers"][0]["credential"]["access_token"], "run-token")
+            self.assertEqual(body["mcp_servers"][0]["skills"][0]["key"], "github_triage")
             return httpx.Response(202, json=run_payload())
 
         client = AgentRuntimeClient(
@@ -159,6 +161,7 @@ class ClientTests(unittest.TestCase):
                 url="https://mcp.example.com/mcp",
                 tools=[RunMCPTool(name="get_issue", access=MCP_TOOL_ACCESS_READ)],
                 credential=RunMCPCredential(type=MCP_CREDENTIAL_BEARER_TOKEN, access_token="run-token"),
+                skills=[SkillRef(key="github_triage")],
             )],
         ))
         self.assertEqual(run.id, "run-1")

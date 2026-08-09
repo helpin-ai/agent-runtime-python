@@ -52,7 +52,7 @@ At callback, consume the state atomically and call `exchange_code`. Use
 refresh token before sending only the access token to Runtime.
 
 ```python
-from agent_runtime import RunMCPCredential, RunMCPServer, RunMCPTool, StartRunRequest
+from agent_runtime import RunMCPCredential, RunMCPServer, RunMCPTool, SkillRef, StartRunRequest
 
 run = client.start_run(StartRunRequest(
     agent_id="agent_123",
@@ -65,6 +65,7 @@ run = client.start_run(StartRunRequest(
             RunMCPTool(name="get_issue", access="read"),
             RunMCPTool(name="create_issue", access="write"),
         ],
+        skills=[SkillRef(key="github_triage")],
         credential=RunMCPCredential(
             type="bearer_token",
             access_token=short_lived_access_token,
