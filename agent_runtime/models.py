@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -356,11 +356,11 @@ class CodexAuthState(BaseModel):
 
 class RunMCPTool(BaseModel):
     name: str
-    access: str
+    access: Literal["read", "write"]
 
 
 class RunMCPCredential(BaseModel):
-    type: str
+    type: Literal["bearer_token", "headers"]
     access_token: Optional[str] = None
     headers: Dict[str, str] = Field(default_factory=dict)
     expires_at: Optional[datetime] = None
@@ -380,9 +380,10 @@ class RunMCPCredentialUpdate(BaseModel):
 class RunMCPServer(BaseModel):
     server_id: str
     server_name: str
-    transport: str = "streamable_http"
+    transport: Literal["streamable_http"] = "streamable_http"
     url: str
     tools: List[RunMCPTool]
+    skills: List[SkillRef] = Field(default_factory=list)
     credential: Optional[RunMCPCredential] = None
 
 

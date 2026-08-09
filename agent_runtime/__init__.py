@@ -81,6 +81,7 @@ from .models import (
     RunPage,
     RunToolCallRequest,
     SkillProviderConfig,
+    SkillRef,
     SkillInfo,
     SkillInterface,
     SkillLookupRequest,
