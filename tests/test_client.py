@@ -287,6 +287,23 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(artifact.id, "art-1")
         self.assertEqual(artifact.artifact_type, "usermaven_visual_report")
 
+    def test_resume_preserves_notification_provenance(self):
+        def handler(request):
+            body = json.loads(request.content)
+            self.assertEqual(request.url.path, "/v1/runs/run-1/resume")
+            self.assertEqual(body["message_provenance"], "system_notification")
+            self.assertEqual(body["resume_id"], "child-1")
+            return httpx.Response(200, json=run_payload())
+
+        client = AgentRuntimeClient(
+            "https://runtime.internal", "app-a",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        client.resume_run("run-1", ResumeRunRequest(
+            intent="reply", content="Child completed", resume_id="child-1",
+            message_provenance="system_notification",
+        ))
+
     def test_append_message_and_resume_helpers_use_resume_contract(self):
         requests = []
 
@@ -489,10 +506,12 @@ class ClientTests(unittest.TestCase):
 
         resume = ResumeRunRequest(
             intent="reply",
+            message_provenance="system_notification",
             resume_id="resume-1",
             interaction_id="interaction-1",
         )
         self.assertEqual(resume.resume_id, "resume-1")
+        self.assertEqual(resume.message_provenance, "system_notification")
         self.assertEqual(resume.interaction_id, "interaction-1")
 
         lookup = SkillLookupRequest(app_id="app-a", key="review_agent")

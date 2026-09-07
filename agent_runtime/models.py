@@ -403,6 +403,7 @@ class StartRunRequest(BaseModel):
 
 
 class ResumeRunRequest(BaseModel):
+    message_provenance: Optional[str] = None
     intent: str
     content: Optional[str] = None
     response_payload: Optional[Dict[str, Any]] = None
