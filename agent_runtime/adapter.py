@@ -6,6 +6,8 @@ from typing import Any, Awaitable, Callable, List, Optional, Union
 from .events import EventEnvelope
 
 from .models import (
+    ModelCredentialRefreshRequest,
+    UpdateRunModelCredentialRequest,
     CleanupWorkspaceRequest,
     CommandExecutionRequest,
     CommandExecutionResponse,
@@ -301,3 +303,28 @@ async def _resolve(value):
     if hasattr(value, "__await__"):
         return await value
     return value
+
+
+def create_fastapi_model_credential_router(handler, *, token: str):
+    """Trusted runtime callback. The app handler owns authorization and refresh locking."""
+    if not token:
+        raise ValueError("a service token is required for credential callbacks")
+    try:
+        from fastapi import APIRouter, Header, HTTPException
+    except ImportError as exc:
+        raise RuntimeError("Install agent-runtime[fastapi] to use FastAPI adapter helpers") from exc
+    router = APIRouter()
+
+    @router.post("/agent-runtime/model-credentials/refresh", response_model=UpdateRunModelCredentialRequest)
+    async def refresh(request: ModelCredentialRefreshRequest, authorization: Optional[str] = Header(default=None)):
+        try:
+            verify_bearer_token(authorization, token)
+        except PermissionError:
+            raise HTTPException(status_code=401, detail="unauthorized")
+        try:
+            return await _resolve(handler(request))
+        except Exception:
+            # Do not expose credential values from app/provider exceptions.
+            raise HTTPException(status_code=401, detail="AI connection requires reconnection") from None
+
+    return router

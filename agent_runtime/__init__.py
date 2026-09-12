@@ -1,9 +1,12 @@
+from .chatgpt_auth import ChatGPTAuthClient, ChatGPTAuthError, ChatGPTToken, DeviceSession
+from .models import RunModel, ModelCredential, ModelCredentialRefreshRequest, UpdateRunModelCredentialRequest
 from .adapter import (
     create_fastapi_command_executor_router,
     create_fastapi_event_callback_router,
     create_fastapi_skill_package_router,
     create_fastapi_mcp_provider_router,
     create_fastapi_target_context_router,
+    create_fastapi_model_credential_router,
     create_fastapi_workspace_provider_router,
     create_fastapi_workspace_skill_lookup_router,
     verify_bearer_token,
@@ -123,6 +126,8 @@ from .nats import (
 )
 
 __all__ = [
+    "ChatGPTAuthClient", "ChatGPTAuthError", "ChatGPTToken", "DeviceSession",
+    "RunModel", "ModelCredential", "ModelCredentialRefreshRequest", "UpdateRunModelCredentialRequest",
     "Agent",
     "AgentRun",
     "AgentRunArtifact",
@@ -220,6 +225,7 @@ __all__ = [
     "create_fastapi_skill_package_router",
     "create_fastapi_mcp_provider_router",
     "create_fastapi_target_context_router",
+    "create_fastapi_model_credential_router",
     "create_fastapi_workspace_provider_router",
     "create_fastapi_workspace_skill_lookup_router",
     "app_event_subject",

@@ -258,3 +258,62 @@ consumer = NATSConsumer(NATSConsumerConfig(
 
 await consumer.run(receive_event)
 ```
+
+### Optional per-run credentials and app-owned ChatGPT login
+
+Existing requests continue to use the runtime's configured keys. Backends can
+optionally supply a key and model for one run:
+
+```python
+from agent_runtime import AgentRuntimeClient, StartRunRequest, RunModel, ModelCredential
+
+runtime = AgentRuntimeClient(runtime_url, app_id="helpin", service_token=service_token)
+run = runtime.start_run(StartRunRequest(
+    app_id="helpin", agent_id=agent_id,
+    target={"type": "workspace", "id": workspace_id},
+    model=RunModel(provider="openai", model="gpt-5.6-luna"),
+    model_credential=ModelCredential(type="api_key", api_key=api_key, connection_id=connection_id),
+))
+```
+
+The runtime needs `AGENT_RUNTIME_MODEL_CREDENTIAL_ENCRYPTION_KEY`. Credentials are
+request-only, encrypted per run, retained when paused, and cleared on terminal
+outcomes. A supplied key never silently falls back to a runtime key.
+`runtime.update_run_model_credential(run.id, credential)` rotates an active run's
+credential; `runtime.revoke_run_model_credential(run.id)` blocks subsequent model
+requests. Connection/account identity is immutable.
+
+```python
+from agent_runtime import ChatGPTAuthClient
+
+auth = ChatGPTAuthClient()
+session = auth.start_device_login()
+# Show session.verification_url and session.user_code to the connecting user.
+# Encrypt the session in your app DB; lock its row before each poll.
+token = auth.poll_device_login(session)  # None means pending; save next_poll_at.
+# Save token encrypted in the app, including its refresh_token.
+# On expiry: token = auth.refresh(token); save the rotated token atomically.
+```
+
+Use `provider="openai_chatgpt"` for subscription inference and send only
+`ModelCredential(type="oauth", access_token=token.access_token,
+expires_at=datetime.fromtimestamp(token.expires_at, timezone.utc),
+account_id=token.account_id, connection_id=connection_id)`. Refresh tokens remain
+in the app. Device sessions expire after 15 minutes; polling/backoff updates must
+be persisted. Errors redact provider responses and token objects hide secrets in
+`repr`. JWT account extraction reads routing metadata, not user authorization.
+
+An app implements a service-authenticated refresh callback accepting
+`ModelCredentialRefreshRequest` and returning `UpdateRunModelCredentialRequest`.
+Verify the active run's owner/workspace, provider and account; serialize refresh
+under a database row lock. Compare `credential_fingerprint` with SHA-256 of your
+current access token so concurrent 401 callbacks reuse a recently rotated token.
+The optional FastAPI helper `create_fastapi_model_credential_router(handler,
+token=service_secret)` mounts `/agent-runtime/model-credentials/refresh`; it
+requires a nonempty service secret. The handler owns authorization and durable
+storage. Register its URL/secret in the runtime's trusted app configuration.
+
+Subscription inference remains opt-in pending live account/deployment validation.
+Device-login support does not establish a generally supported third-party hosted
+subscription API. No Codex process, connection database, refresh scheduler, or
+billing policy is part of this SDK.

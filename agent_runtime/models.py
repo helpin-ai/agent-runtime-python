@@ -119,7 +119,37 @@ class TurnPolicy(BaseModel):
     expired_resume_strategy: Optional[str] = None
 
 
+class RunModel(BaseModel):
+    provider: str
+    model: str
+
+
+class ModelCredential(BaseModel):
+    type: str
+    api_key: Optional[str] = Field(default=None, repr=False)
+    access_token: Optional[str] = Field(default=None, repr=False)
+    expires_at: Optional[datetime] = None
+    connection_id: Optional[str] = None
+    account_id: Optional[str] = None
+
+
+class ModelCredentialRefreshRequest(BaseModel):
+    app_id: str
+    run_id: str
+    host_run_id: str = ""
+    connection_id: str
+    provider: str
+    account_id: str = ""
+    reason: str
+    credential_fingerprint: str = ""
+
+class UpdateRunModelCredentialRequest(BaseModel):
+    credential: ModelCredential = Field(repr=False)
+
+
 class RunInput(BaseModel):
+    model: Optional[RunModel] = None
+    credential_source: Optional[str] = None
     instructions: Optional[str] = None
     allowed_tools: List[str] = Field(default_factory=list)
     trigger: Dict[str, Any] = Field(default_factory=dict)
@@ -387,6 +417,8 @@ class RunMCPServer(BaseModel):
 
 
 class StartRunRequest(BaseModel):
+    model: Optional[RunModel] = None
+    model_credential: Optional[ModelCredential] = Field(default=None, repr=False)
     app_id: str = ""
     host_run_id: Optional[str] = None
     agent_id: str
@@ -427,6 +459,8 @@ class AppendArtifactRequest(BaseModel):
 
 
 class ProviderCapability(BaseModel):
+    auth_modes: List[str] = Field(default_factory=list)
+    run_credentials_configured: bool = False
     name: str
     configured: bool = False
     default_model: Optional[str] = None

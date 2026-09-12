@@ -1,0 +1,6 @@
+Device authentication protocol adapted from OpenAI Codex.
+Copyright 2025 OpenAI. Licensed under the Apache License, Version 2.0.
+Source: https://github.com/openai/codex/tree/53c542d944c705f3a66780a19223223bee57cbb6/codex-rs/login
+Changes: implemented app-owned device session polling, bounded HTTP requests,
+refresh-token exchange, redacted errors, and account identity checks in this SDK.
+No Codex executor or token-storage implementation is included.

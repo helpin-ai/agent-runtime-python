@@ -7,6 +7,7 @@ from urllib.parse import quote
 import httpx
 
 from .models import (
+    ModelCredential,
     Agent,
     AgentRun,
     AgentRunArtifact,
@@ -143,6 +144,13 @@ class AgentRuntimeClient:
     def get_run(self, run_id: str) -> AgentRun:
         data = self._request("GET", self._run_path(run_id), params=self._app_params())
         return AgentRun(**data)
+
+    def update_run_model_credential(self, run_id: str, credential: ModelCredential | Dict[str, Any]) -> Dict[str, Any]:
+        return self._request("PUT", f"/v1/runs/{quote(run_id, safe='')}/model-credential",
+                             params=self._app_params(), json={"credential": self._dump(credential)})
+
+    def revoke_run_model_credential(self, run_id: str) -> None:
+        self._request("DELETE", f"/v1/runs/{quote(run_id, safe='')}/model-credential", params=self._app_params())
 
     def update_run_mcp_credential(
         self,
@@ -468,5 +476,5 @@ class AgentRuntimeClient:
         if isinstance(value, dict):
             return dict(value)
         if hasattr(value, "model_dump"):
-            return value.model_dump(exclude_none=True, by_alias=True)
-        return value.dict(exclude_none=True, by_alias=True)
+            return value.model_dump(mode="json", exclude_none=True, by_alias=True)
+        return json.loads(value.json(exclude_none=True, by_alias=True))
