@@ -407,23 +407,7 @@ class AgentRuntimeClient:
         data = self._request("POST", self._run_path(run_id, "/cancel"), params=self._app_params(), json={})
         return AgentRun(**data)
 
-    def start_codex_device_code_auth(self, run_id: str) -> CodexAuthState:
-        data = self._request(
-            "POST",
-            self._run_path(run_id, "/codex-auth/device-code/start"),
-            params=self._app_params(),
-            json={},
-        )
-        return CodexAuthState(**data)
 
-    def cancel_codex_device_code_auth(self, run_id: str) -> CodexAuthState:
-        data = self._request(
-            "POST",
-            self._run_path(run_id, "/codex-auth/device-code/cancel"),
-            params=self._app_params(),
-            json={},
-        )
-        return CodexAuthState(**data)
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         headers = self._headers(kwargs.pop("headers", None))

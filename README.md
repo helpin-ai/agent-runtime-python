@@ -130,14 +130,6 @@ print(snapshot.through_sequence, snapshot.state)
 For JetStream consumers, use `v2_app_event_subject(app_id)` with a separate
 durable consumer. The existing `NATSConsumerConfig` defaults remain on v1.
 
-Codex ChatGPT device-code auth can be driven through the SDK when a Codex run
-pauses for authentication.
-
-```python
-state = client.start_codex_device_code_auth(run.id)
-print(state.verification_url, state.user_code)
-```
-
 Use stable correlation fields when a resume may be retried or resolves a
 specific pending interaction.
 

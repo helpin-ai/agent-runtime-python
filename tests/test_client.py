@@ -407,41 +407,6 @@ class ClientTests(unittest.TestCase):
         self.assertFalse(result.is_error)
         self.assertEqual(result.content[0].text, "{\"content\":\"hello\"}")
 
-    def test_codex_device_code_auth(self):
-        seen = []
-
-        def handler(request):
-            seen.append(request.url.path)
-            if request.url.path.endswith("/start"):
-                return httpx.Response(200, json={
-                    "provider": "openai",
-                    "auth_mode": "chatgpt_device_code",
-                    "state": "pending",
-                    "login_id": "login-1",
-                    "verification_url": "https://example.test/device",
-                    "user_code": "ABCD",
-                    "updated_at": "2026-06-23T00:00:00Z",
-                })
-            return httpx.Response(200, json={
-                "provider": "openai",
-                "auth_mode": "chatgpt_device_code",
-                "state": "cancelled",
-                "updated_at": "2026-06-23T00:00:01Z",
-            })
-
-        client = AgentRuntimeClient(
-            "https://runtime.internal",
-            "app-a",
-            client=httpx.Client(transport=httpx.MockTransport(handler)),
-        )
-        pending = client.start_codex_device_code_auth("run-1")
-        cancelled = client.cancel_codex_device_code_auth("run-1")
-        self.assertEqual(pending.user_code, "ABCD")
-        self.assertEqual(cancelled.state, "cancelled")
-        self.assertEqual(seen, [
-            "/v1/runs/run-1/codex-auth/device-code/start",
-            "/v1/runs/run-1/codex-auth/device-code/cancel",
-        ])
 
     def test_errors_surface_message(self):
         client = AgentRuntimeClient(
