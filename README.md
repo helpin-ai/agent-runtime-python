@@ -2,6 +2,15 @@
 
 Thin Python client and adapter helpers for the service-first Agent Runtime.
 
+Install the tagged SDK from GitHub:
+
+```bash
+pip install "agent-runtime @ git+https://github.com/helpin-ai/agent-runtime-python.git@v0.5.0"
+```
+
+The `agent-runtime` project on PyPI is a different package. For optional
+integrations, use the same Git URL with extras, such as `agent-runtime[nats]`.
+
 ```python
 from agent_runtime import AgentRuntimeClient
 
@@ -52,7 +61,7 @@ At callback, consume the state atomically and call `exchange_code`. Use
 refresh token before sending only the access token to Runtime.
 
 ```python
-from agent_runtime import RunMCPCredential, RunMCPServer, RunMCPTool, StartRunRequest
+from agent_runtime import RunMCPCredential, RunMCPServer, RunMCPTool, SkillRef, StartRunRequest
 
 run = client.start_run(StartRunRequest(
     agent_id="agent_123",
@@ -65,6 +74,7 @@ run = client.start_run(StartRunRequest(
             RunMCPTool(name="get_issue", access="read"),
             RunMCPTool(name="create_issue", access="write"),
         ],
+        skills=[SkillRef(key="github_triage")],
         credential=RunMCPCredential(
             type="bearer_token",
             access_token=short_lived_access_token,
@@ -243,7 +253,7 @@ app.include_router(
 
 ## NATS / JetStream events
 
-Install the optional integration with `pip install "agent-runtime[nats]"`.
+Install the optional integration with `pip install "agent-runtime[nats] @ git+https://github.com/helpin-ai/agent-runtime-python.git@v0.5.0"`.
 The async consumer matches the runtime's default stream/subject layout and
 uses explicit acknowledgements with bounded progressive retries.
 

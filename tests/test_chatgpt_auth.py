@@ -56,10 +56,8 @@ def test_throttle_expiry_and_secret_representation():
     credential = ModelCredential(type="api_key",api_key="secret",expires_at=datetime.now(timezone.utc))
     assert "secret" not in repr(credential)
 
-def test_client_serializes_expiry_and_callback_requires_service_auth():
-    from agent_runtime import AgentRuntimeClient, create_fastapi_model_credential_router, UpdateRunModelCredentialRequest
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
+def test_client_serializes_expiry():
+    from agent_runtime import AgentRuntimeClient
     expiry = datetime.now(timezone.utc)
     credential = ModelCredential(type="oauth", access_token="access", account_id="account", connection_id="connection", expires_at=expiry)
     def handle(request):
@@ -69,6 +67,16 @@ def test_client_serializes_expiry_and_callback_requires_service_auth():
         return httpx.Response(200, json={"run_id":"run"})
     client = AgentRuntimeClient("https://runtime.example", "app", client=httpx.Client(transport=httpx.MockTransport(handle)))
     client.update_run_model_credential("run", credential)
+
+
+@pytest.mark.optional
+def test_callback_requires_service_auth():
+    pytest.importorskip("fastapi")
+    from agent_runtime import create_fastapi_model_credential_router, UpdateRunModelCredentialRequest
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    credential = ModelCredential(type="oauth", access_token="access", account_id="account", connection_id="connection", expires_at=datetime.now(timezone.utc))
     calls = []
     def refresh(request):
         calls.append(request)

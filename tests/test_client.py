@@ -22,6 +22,7 @@ from agent_runtime import (
     RunMCPServer,
     RunMCPTool,
     RESUME_INTENT_APPROVE,
+    SkillRef,
     RESUME_INTENT_REQUEST_CHANGES,
     SkillLookupRequest,
     StartRunRequest,
@@ -140,6 +141,7 @@ class ClientTests(unittest.TestCase):
             self.assertEqual(body["host_run_id"], "host-1")
             self.assertEqual(body["turn_policy"]["mode"], TURN_POLICY_PAUSE_AFTER_ASSISTANT)
             self.assertEqual(body["mcp_servers"][0]["credential"]["access_token"], "run-token")
+            self.assertEqual(body["mcp_servers"][0]["skills"][0]["key"], "github_triage")
             return httpx.Response(202, json=run_payload())
 
         client = AgentRuntimeClient(
@@ -159,10 +161,25 @@ class ClientTests(unittest.TestCase):
                 url="https://mcp.example.com/mcp",
                 tools=[RunMCPTool(name="get_issue", access=MCP_TOOL_ACCESS_READ)],
                 credential=RunMCPCredential(type=MCP_CREDENTIAL_BEARER_TOKEN, access_token="run-token"),
+                skills=[SkillRef(key="github_triage")],
             )],
         ))
         self.assertEqual(run.id, "run-1")
         self.assertNotIn("run-token", run.model_dump_json() if hasattr(run, "model_dump_json") else run.json())
+
+    def test_run_mcp_models_reject_unsupported_contract_values(self):
+        with self.assertRaises(ValueError):
+            RunMCPTool(name="delete_everything", access="admin")
+        with self.assertRaises(ValueError):
+            RunMCPCredential(type="basic", access_token="secret")
+        with self.assertRaises(ValueError):
+            RunMCPServer(
+                server_id="server-1",
+                server_name="example",
+                transport="stdio",
+                url="https://mcp.example.com/mcp",
+                tools=[RunMCPTool(name="read", access="read")],
+            )
 
     def test_update_run_mcp_credential(self):
         def handler(request):
