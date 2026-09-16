@@ -1,5 +1,9 @@
 # agent-runtime Python SDK
 
+Licensed under [Apache-2.0](LICENSE). Third-party material retains its own
+licenses and notices, including the OpenAI Codex attribution in
+[NOTICE-CODEX](NOTICE-CODEX).
+
 Thin Python client and adapter helpers for the service-first Agent Runtime.
 
 Install the tagged SDK from GitHub:
