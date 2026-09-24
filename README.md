@@ -9,7 +9,7 @@ Thin Python client and adapter helpers for the service-first Agent Runtime.
 Install the tagged SDK from GitHub:
 
 ```bash
-pip install "agent-runtime @ git+https://github.com/helpin-ai/agent-runtime-python.git@v0.5.0"
+pip install "agent-runtime @ git+https://github.com/helpin-ai/agent-runtime-python.git@v0.6.0"
 ```
 
 The `agent-runtime` project on PyPI is a different package. For optional
