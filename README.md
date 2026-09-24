@@ -156,6 +156,14 @@ resumed = client.resume_run(run.id, {
 })
 ```
 
+For a durable run, request a manual pause and continue the same run after its
+status becomes `paused` with `pause_reason` set to `manual`:
+
+```python
+client.pause_run(run.id)
+resumed = client.continue_run(run.id, external_actor_id="user-123")
+```
+
 Run-scoped tools are also available through the service API. Workspace-coupled
 tools such as filesystem, patch, command, and git tools run in-process inside
 agent-runtime; external API integrations should generally stay behind MCP or

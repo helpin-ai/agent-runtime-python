@@ -28,7 +28,7 @@ from .models import (
     ToolCall,
     UpdateRunMCPCredentialRequest,
 )
-from .constants import RESUME_INTENT_APPROVE, RESUME_INTENT_REQUEST_CHANGES
+from .constants import RESUME_INTENT_APPROVE, RESUME_INTENT_CONTINUE, RESUME_INTENT_REQUEST_CHANGES
 from .events import EventEnvelope, EventListResponse, StreamStateSnapshot, parse_event_envelope
 
 
@@ -372,6 +372,26 @@ class AgentRuntimeClient:
             json=self._dump(request),
         )
         return AgentRun(**data)
+
+    def pause_run(self, run_id: str) -> AgentRun:
+        """Request a manual pause; the run may remain active until its worker stops."""
+        data = self._request("POST", self._run_path(run_id, "/pause"), params=self._app_params())
+        return AgentRun(**data)
+
+    def continue_run(
+        self,
+        run_id: str,
+        external_actor_id: Optional[str] = None,
+        *,
+        resume_id: Optional[str] = None,
+    ) -> AgentRun:
+        """Continue a manually paused run without sending a new message."""
+        payload: Dict[str, Any] = {"intent": RESUME_INTENT_CONTINUE}
+        if external_actor_id:
+            payload["external_actor_id"] = external_actor_id
+        if resume_id:
+            payload["resume_id"] = resume_id
+        return self.resume_run(run_id, payload)
 
     def approve_run(
         self,

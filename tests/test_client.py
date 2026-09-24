@@ -22,8 +22,10 @@ from agent_runtime import (
     RunMCPServer,
     RunMCPTool,
     RESUME_INTENT_APPROVE,
+    RESUME_INTENT_CONTINUE,
     SkillRef,
     RESUME_INTENT_REQUEST_CHANGES,
+    PAUSE_REASON_MANUAL,
     SkillLookupRequest,
     StartRunRequest,
     TargetContextRequest,
@@ -320,6 +322,36 @@ class ClientTests(unittest.TestCase):
             intent="reply", content="Child completed", resume_id="child-1",
             message_provenance="system_notification",
         ))
+
+    def test_pause_and_continue_run_use_additive_contract(self):
+        requests = []
+
+        def handler(request):
+            requests.append(request)
+            self.assertEqual(request.headers["authorization"], "Bearer secret")
+            self.assertEqual(request.url.params["app_id"], "app-a")
+            if request.url.path.endswith("/pause"):
+                self.assertEqual(request.url.path, "/v1/runs/run-1/pause")
+                self.assertEqual(request.content, b"")
+                return httpx.Response(200, json={**run_payload(), "status": "paused", "pause_reason": PAUSE_REASON_MANUAL})
+            self.assertEqual(request.url.path, "/v1/runs/run-1/resume")
+            self.assertEqual(json.loads(request.content), {
+                "intent": RESUME_INTENT_CONTINUE,
+                "external_actor_id": "user-1",
+                "resume_id": "continue-1",
+            })
+            return httpx.Response(200, json={**run_payload(), "status": "running"})
+
+        client = AgentRuntimeClient(
+            "https://runtime.internal", "app-a", service_token="secret",
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        paused = client.pause_run("run-1")
+        resumed = client.continue_run("run-1", external_actor_id="user-1", resume_id="continue-1")
+
+        self.assertEqual((paused.status, paused.pause_reason), ("paused", PAUSE_REASON_MANUAL))
+        self.assertEqual((resumed.id, resumed.status), (paused.id, "running"))
+        self.assertEqual(len(requests), 2)
 
     def test_append_message_and_resume_helpers_use_resume_contract(self):
         requests = []
